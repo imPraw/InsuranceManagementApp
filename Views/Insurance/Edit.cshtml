@@ -1,0 +1,43 @@
+﻿@model InsuranceManagement.Web.Models.InsurancePolicy
+
+<h2>Edit Policy</h2>
+
+<form asp-action="Edit">
+
+    <input type="hidden" asp-for="Id" />
+
+    <div>
+        <label asp-for="PolicyNumber"></label>
+        <input asp-for="PolicyNumber" />
+        <span asp-validation-for="PolicyNumber"></span>
+    </div>
+
+    <div>
+        <label asp-for="PolicyHolderName"></label>
+        <input asp-for="PolicyHolderName" />
+    </div>
+
+    <div>
+        <label asp-for="InsuranceType"></label>
+        <input asp-for="InsuranceType" />
+    </div>
+
+    <div>
+        <label asp-for="CoverageAmount"></label>
+        <input asp-for="CoverageAmount" />
+    </div>
+
+    <div>
+        <label asp-for="Premium"></label>
+        <input asp-for="Premium" />
+    </div>
+
+    <div>
+        <label asp-for="PolicyStatus"></label>
+        <input asp-for="PolicyStatus" />
+    </div>
+
+    <button type="submit">Save</button>
+</form>
+
+<a asp-action="Index">Back</a>

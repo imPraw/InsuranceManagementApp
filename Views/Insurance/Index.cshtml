@@ -1,0 +1,32 @@
+﻿@model IEnumerable<InsuranceManagement.Web.Models.InsurancePolicy>
+
+<h2>Insurance Policies</h2>
+
+<p>
+    <a asp-action="Create">Add New Policy</a>
+</p>
+
+<table class="table">
+    <tr>
+        <th>Policy Number</th>
+        <th>Holder</th>
+        <th>Type</th>
+        <th>Status</th>
+        <th>Actions</th>
+    </tr>
+
+@foreach (var item in Model)
+{
+    <tr>
+        <td>@item.PolicyNumber</td>
+        <td>@item.PolicyHolderName</td>
+        <td>@item.InsuranceType</td>
+        <td>@item.PolicyStatus</td>
+        <td>
+            <a asp-action="Details" asp-route-id="@item.Id">Details</a> |
+            <a asp-action="Edit" asp-route-id="@item.Id">Edit</a> |
+            <a asp-action="Delete" asp-route-id="@item.Id">Delete</a>
+        </td>
+    </tr>
+}
+</table>

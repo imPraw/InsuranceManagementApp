@@ -1,0 +1,12 @@
+﻿@model InsuranceManagement.Web.Models.InsurancePolicy
+
+<h2>Policy Details</h2>
+
+<p><b>Policy Number:</b> @Model.PolicyNumber</p>
+<p><b>Holder:</b> @Model.PolicyHolderName</p>
+<p><b>Type:</b> @Model.InsuranceType</p>
+<p><b>Coverage:</b> @Model.CoverageAmount</p>
+<p><b>Premium:</b> @Model.Premium</p>
+<p><b>Status:</b> @Model.PolicyStatus</p>
+
+<a asp-action="Index">Back</a>

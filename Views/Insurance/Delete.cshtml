@@ -1,0 +1,12 @@
+﻿@model InsuranceManagement.Web.Models.InsurancePolicy
+
+<h2>Delete Policy</h2>
+
+<p>Are you sure you want to delete policy <b>@Model.PolicyNumber</b>?</p>
+
+<form asp-action="Delete">
+    <input type="hidden" asp-for="Id" />
+    <button type="submit">Delete</button>
+</form>
+
+<a asp-action="Index">Cancel</a>
