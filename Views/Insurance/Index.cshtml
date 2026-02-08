@@ -1,11 +1,14 @@
-﻿@model IEnumerable<InsuranceManagement.Web.Models.InsurancePolicy>
+﻿@* This tells Razor that this view expects a list of InsurancePolicy objects. *@
+@model IEnumerable<InsuranceManagement.Web.Models.InsurancePolicy>
 
 <h2>Insurance Policies</h2>
 
 <p>
+    @* asp-action generates a link to the Create action in InsuranceController. *@
     <a asp-action="Create">Add New Policy</a>
 </p>
 
+@* Display all policies in an HTML table. *@
 <table class="table">
     <tr>
         <th>Policy Number</th>
@@ -15,18 +18,20 @@
         <th>Actions</th>
     </tr>
 
-@foreach (var item in Model)
-{
-    <tr>
-        <td>@item.PolicyNumber</td>
-        <td>@item.PolicyHolderName</td>
-        <td>@item.InsuranceType</td>
-        <td>@item.PolicyStatus</td>
-        <td>
-            <a asp-action="Details" asp-route-id="@item.Id">Details</a> |
-            <a asp-action="Edit" asp-route-id="@item.Id">Edit</a> |
-            <a asp-action="Delete" asp-route-id="@item.Id">Delete</a>
-        </td>
-    </tr>
-}
+    @* Loop through each policy in the Model collection and display it as a row. *@
+    @foreach (var item in Model)
+    {
+        <tr>
+            <td>@item.PolicyNumber</td>
+            <td>@item.PolicyHolderName</td>
+            <td>@item.InsuranceType</td>
+            <td>@item.PolicyStatus</td>
+            <td>
+                @* asp-route-id passes the policy's Id to the controller action. *@
+                <a asp-action="Details" asp-route-id="@item.Id">Details</a> |
+                <a asp-action="Edit" asp-route-id="@item.Id">Edit</a> |
+                <a asp-action="Delete" asp-route-id="@item.Id">Delete</a>
+            </td>
+        </tr>
+    }
 </table>
