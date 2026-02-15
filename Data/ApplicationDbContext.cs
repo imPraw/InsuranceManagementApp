@@ -18,5 +18,12 @@ namespace InsuranceManagement.Web.Data
         // We use this to query, add, update, and delete records.
         // EF Core will create a table called "InsurancePolicies" based on this.
         public DbSet<InsurancePolicy> InsurancePolicies { get; set; }
+
+        // Authentication/Authorization DbSets
+        public DbSet<AppUser> AppUsers { get; set; }
+        public DbSet<Role> Roles { get; set; }
+        public DbSet<UserRole> UserRoles { get; set; }
+        public DbSet<Menu> Menus { get; set; }
+        public DbSet<UserMenu> UserMenus { get; set; }
     }
 }
