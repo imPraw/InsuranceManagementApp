@@ -1,0 +1,147 @@
+@model IEnumerable<InsuranceManagement.Web.Models.InsurancePolicy>
+@{
+    ViewData["Title"] = "Admin - Policy Applications";
+    var filter = ViewBag.Filter as string ?? "Pending";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-clipboard-check"></i> Policy Applications</h2>
+    <a asp-action="Index" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back
+    </a>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show">
+        <i class="bi bi-check-circle"></i> @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- Status Filter Tabs -->
+<ul class="nav nav-tabs mb-4">
+    @foreach (var (status, count, color) in new[] {
+        ("Pending", (int)ViewBag.PendingCount, "warning"),
+        ("Approved", (int)ViewBag.ApprovedCount, "success"),
+        ("Denied", (int)ViewBag.DeniedCount, "danger")
+    })
+    {
+        <li class="nav-item">
+            <a class="nav-link @(filter == status ? "active fw-bold" : "")"
+               asp-action="AdminDashboard" asp-route-filter="@status">
+                @status
+                <span class="badge bg-@color text-@(status == "Pending" ? "dark" : "white") ms-1">@count</span>
+            </a>
+        </li>
+    }
+</ul>
+
+@if (!Model.Any())
+{
+    <div class="text-center py-5 text-muted">
+        <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+        <p class="mt-2">No @filter.ToLower() applications.</p>
+    </div>
+}
+else
+{
+    <table class="table table-hover table-bordered">
+        <thead class="table-dark">
+            <tr>
+                <th>Policy #</th>
+                <th>Applicant</th>
+                <th>Type</th>
+                <th>Coverage</th>
+                <th>Premium/mo</th>
+                <th>Description</th>
+                <th>Applied</th>
+                @if (filter != "Pending") { <th>Reviewed</th> }
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in Model)
+            {
+                <tr>
+                    <td><strong>@p.PolicyNumber</strong></td>
+                    <td>@(p.User?.FullName ?? p.User?.Username ?? "—")</td>
+                    <td>@p.InsuranceType</td>
+                    <td>$@p.CoverageAmount.ToString("N2")</td>
+                    <td>$@p.Premium.ToString("N2")</td>
+                    <td>
+                        <span class="d-inline-block text-truncate" style="max-width:180px;" title="@p.ApplicationDescription">
+                            @p.ApplicationDescription
+                        </span>
+                    </td>
+                    <td>@p.ApplicationDate.ToString("MMM dd, yyyy")</td>
+                    @if (filter != "Pending")
+                    {
+                        <td>@(p.ReviewedAt?.ToString("MMM dd, yyyy") ?? "—")</td>
+                    }
+                    <td>
+                        <a asp-action="Details" asp-route-id="@p.Id" class="btn btn-sm btn-outline-info">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                        @if (p.Status == InsuranceManagement.Web.Models.PolicyStatus.Pending)
+                        {
+                            <button class="btn btn-sm btn-success ms-1"
+                                    onclick="openReviewModal(@p.Id, '@p.PolicyNumber', 'Approve')">
+                                <i class="bi bi-check-lg"></i> Approve
+                            </button>
+                            <button class="btn btn-sm btn-danger ms-1"
+                                    onclick="openReviewModal(@p.Id, '@p.PolicyNumber', 'Deny')">
+                                <i class="bi bi-x-lg"></i> Deny
+                            </button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<!-- Review Modal -->
+<div class="modal fade" id="reviewModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form asp-action="ReviewPolicy" method="post" class="modal-content">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="modal-policy-id" />
+            <input type="hidden" name="decision" id="modal-decision" />
+            <div class="modal-header">
+                <h5 class="modal-title" id="modal-title">Review Policy</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="modal-description" class="text-muted"></p>
+                <label class="form-label fw-bold">Remarks for Applicant (optional)</label>
+                <textarea name="remarks" class="form-control" rows="3"
+                          placeholder="Add a note explaining your decision..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn" id="modal-submit-btn">Confirm</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function openReviewModal(policyId, policyNumber, decision) {
+        document.getElementById('modal-policy-id').value = policyId;
+        document.getElementById('modal-decision').value = decision;
+        document.getElementById('modal-title').textContent = decision + ' Policy ' + policyNumber;
+        document.getElementById('modal-description').textContent =
+            decision === 'Approve'
+                ? 'This will approve the policy and allow the user to file claims.'
+                : 'This will deny the application. The user will be notified.';
+
+        const btn = document.getElementById('modal-submit-btn');
+        btn.textContent = decision === 'Approve' ? '✓ Approve' : '✗ Deny';
+        btn.className = 'btn ' + (decision === 'Approve' ? 'btn-success' : 'btn-danger');
+
+        new bootstrap.Modal(document.getElementById('reviewModal')).show();
+    }
+</script>
+}

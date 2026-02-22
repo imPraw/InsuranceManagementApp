@@ -1,0 +1,87 @@
+@model InsuranceManagement.Web.Models.InsurancePolicy
+@{
+    ViewData["Title"] = "Apply for Insurance Policy";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="bi bi-file-earmark-plus"></i> Apply for Insurance Policy</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-4">Fill in the details below to apply. An admin will review your application and notify you of the decision.</p>
+
+                <form asp-action="Apply" method="post">
+                    @Html.AntiForgeryToken()
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label asp-for="PolicyHolderName" class="form-label fw-bold">Policy Holder Name</label>
+                            <input asp-for="PolicyHolderName" class="form-control" placeholder="Your full name" />
+                            <span asp-validation-for="PolicyHolderName" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="InsuranceType" class="form-label fw-bold">Insurance Type</label>
+                            <select asp-for="InsuranceType" class="form-select">
+                                <option value="">-- Select Type --</option>
+                                <option>Health</option>
+                                <option>Auto</option>
+                                <option>Life</option>
+                                <option>Home</option>
+                                <option>Travel</option>
+                                <option>Business</option>
+                            </select>
+                            <span asp-validation-for="InsuranceType" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="ApplicationDescription" class="form-label fw-bold">Description / Reason for Application</label>
+                        <textarea asp-for="ApplicationDescription" class="form-control" rows="3"
+                                  placeholder="Describe what you need coverage for and why you're applying..."></textarea>
+                        <span asp-validation-for="ApplicationDescription" class="text-danger small"></span>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label asp-for="CoverageAmount" class="form-label fw-bold">Coverage Amount ($)</label>
+                            <input asp-for="CoverageAmount" type="number" step="100" min="0" class="form-control" placeholder="e.g. 100000" />
+                            <span asp-validation-for="CoverageAmount" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="Premium" class="form-label fw-bold">Monthly Premium ($)</label>
+                            <input asp-for="Premium" type="number" step="0.01" min="0" class="form-control" placeholder="e.g. 250.00" />
+                            <span asp-validation-for="Premium" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label asp-for="StartDate" class="form-label fw-bold">Desired Start Date</label>
+                            <input asp-for="StartDate" type="date" class="form-control" />
+                            <span asp-validation-for="StartDate" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-6">
+                            <label asp-for="EndDate" class="form-label fw-bold">Desired End Date</label>
+                            <input asp-for="EndDate" type="date" class="form-control" />
+                            <span asp-validation-for="EndDate" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-send"></i> Submit Application
+                        </button>
+                        <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+}
