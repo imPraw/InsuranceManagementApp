@@ -1,0 +1,155 @@
+@model IEnumerable<InsuranceManagement.Web.Models.Claim>
+@{
+    ViewData["Title"] = "Admin - All Claims";
+    var filter = ViewBag.Filter as string ?? "";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-list-check"></i> All Claims</h2>
+    <a asp-action="AdminDashboard" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Policy Dashboard
+    </a>
+</div>
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show">
+        <i class="bi bi-check-circle"></i> @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<!-- Filter pills -->
+<div class="mb-3 d-flex flex-wrap gap-2">
+    @{
+        var statuses = new[] { "", "Submitted", "UnderReview", "Approved", "Denied", "Settled" };
+        var labels = new[] { "All", "Submitted", "Under Review", "Approved", "Denied", "Settled" };
+        for (int i = 0; i < statuses.Length; i++)
+        {
+            var s = statuses[i];
+            <a asp-action="AllClaims" asp-route-filter="@s"
+               class="btn btn-sm @(filter == s ? "btn-dark" : "btn-outline-secondary")">
+                @labels[i]
+            </a>
+        }
+    }
+</div>
+
+@if (!Model.Any())
+{
+    <div class="text-center py-5 text-muted">
+        <i class="bi bi-clipboard-x" style="font-size: 3rem;"></i>
+        <p class="mt-2">No claims found.</p>
+    </div>
+}
+else
+{
+    <table class="table table-hover table-bordered">
+        <thead class="table-dark">
+            <tr>
+                <th>Claim #</th>
+                <th>User</th>
+                <th>Policy</th>
+                <th>Amount</th>
+                <th>Incident</th>
+                <th>Submitted</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var c in Model)
+            {
+                var badge = c.Status switch {
+                    InsuranceManagement.Web.Models.ClaimStatus.Submitted => "bg-secondary",
+                    InsuranceManagement.Web.Models.ClaimStatus.UnderReview => "bg-warning text-dark",
+                    InsuranceManagement.Web.Models.ClaimStatus.Approved => "bg-primary",
+                    InsuranceManagement.Web.Models.ClaimStatus.Denied => "bg-danger",
+                    InsuranceManagement.Web.Models.ClaimStatus.Settled => "bg-success",
+                    _ => "bg-secondary"
+                };
+                <tr>
+                    <td><strong>@c.ClaimNumber</strong></td>
+                    <td>@(c.User?.FullName ?? c.User?.Username)</td>
+                    <td>@c.InsurancePolicy?.PolicyNumber</td>
+                    <td>$@c.ClaimAmount.ToString("N2")</td>
+                    <td>@c.IncidentDate.ToString("MMM dd, yyyy")</td>
+                    <td>@c.SubmittedAt.ToString("MMM dd, yyyy")</td>
+                    <td><span class="badge @badge">@c.Status</span></td>
+                    <td>
+                        @if (c.Status == InsuranceManagement.Web.Models.ClaimStatus.Submitted ||
+                             c.Status == InsuranceManagement.Web.Models.ClaimStatus.UnderReview)
+                        {
+                            <button class="btn btn-sm btn-success"
+                                    onclick="openClaimModal(@c.Id, '@c.ClaimNumber', 'Approve')">
+                                <i class="bi bi-check-lg"></i> Approve
+                            </button>
+                            <button class="btn btn-sm btn-danger ms-1"
+                                    onclick="openClaimModal(@c.Id, '@c.ClaimNumber', 'Deny')">
+                                <i class="bi bi-x-lg"></i> Deny
+                            </button>
+                        }
+                        else
+                        {
+                            <span class="text-muted small">
+                                @(c.SettledAmount.HasValue ? "$" + c.SettledAmount.Value.ToString("N2") : "Finalized")
+                            </span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<!-- Review Claim Modal -->
+<div class="modal fade" id="claimModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form asp-action="ReviewClaim" method="post" class="modal-content">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" id="claim-modal-id" />
+            <input type="hidden" name="decision" id="claim-modal-decision" />
+            <div class="modal-header">
+                <h5 class="modal-title" id="claim-modal-title">Review Claim</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="settled-amount-group" class="mb-3" style="display:none;">
+                    <label class="form-label fw-bold">Settlement Amount ($) <span class="text-muted fw-normal">(optional)</span></label>
+                    <input type="number" name="settledAmount" step="0.01" min="0.01" class="form-control"
+                           placeholder="Leave blank to mark as Approved without settlement" />
+                    <div class="form-text">If provided, the claim will be marked as Settled immediately.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Remarks (optional)</label>
+                    <textarea name="remarks" class="form-control" rows="3"
+                              placeholder="Add notes for the claimant..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn" id="claim-modal-btn">Confirm</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function openClaimModal(claimId, claimNumber, decision) {
+        document.getElementById('claim-modal-id').value = claimId;
+        document.getElementById('claim-modal-decision').value = decision;
+        document.getElementById('claim-modal-title').textContent = decision + ' Claim ' + claimNumber;
+
+        const btn = document.getElementById('claim-modal-btn');
+        btn.textContent = decision === 'Approve' ? '✓ Approve' : '✗ Deny';
+        btn.className = 'btn ' + (decision === 'Approve' ? 'btn-success' : 'btn-danger');
+
+        // Show settlement amount only for approvals
+        document.getElementById('settled-amount-group').style.display =
+            decision === 'Approve' ? 'block' : 'none';
+
+        new bootstrap.Modal(document.getElementById('claimModal')).show();
+    }
+</script>
+}
