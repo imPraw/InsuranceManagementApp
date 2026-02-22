@@ -1,18 +1,25 @@
-﻿using System;
+using System;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace InsuranceManagement.Web.Models
 {
-    // This class represents a single insurance policy in our system.
-    // Each property here will become a column in the database table.
+    // Enum to track where a policy is in the approval workflow.
+    public enum PolicyStatus
+    {
+        Pending,   // Just applied, waiting for admin review
+        Approved,  // Admin approved - user can now file claims
+        Denied,    // Admin rejected the application
+        Cancelled  // Cancelled
+    }
+
     public class InsurancePolicy
     {
-        // Primary key - uniquely identifies each policy in the database.
-        // EF Core will auto-generate this value when we create new records.
         public int Id { get; set; }
 
-        // [Required] means this field cannot be left empty.
-        // This validation happens both client-side (browser) and server-side.
+        // Links this policy to the user who applied for it
+        public int UserId { get; set; }
+
         [Required]
         public string PolicyNumber { get; set; } = string.Empty;
 
@@ -22,23 +29,43 @@ namespace InsuranceManagement.Web.Models
         [Required]
         public string InsuranceType { get; set; } = string.Empty;
 
-        // [Range] ensures the value is between 0 and the maximum possible decimal.
-        // This prevents negative coverage amounts.
+        // What the user is applying for - describes their situation
+        [Required]
+        [StringLength(1000)]
+        public string ApplicationDescription { get; set; } = string.Empty;
+
         [Range(0, double.MaxValue)]
         public decimal CoverageAmount { get; set; }
 
         [Range(0, double.MaxValue)]
         public decimal Premium { get; set; }
 
-        // [DataType(DataType.Date)] tells the browser to show a date picker.
-        // It also formats the date properly in views.
         [DataType(DataType.Date)]
         public DateTime StartDate { get; set; }
 
         [DataType(DataType.Date)]
         public DateTime EndDate { get; set; }
 
-        [Required]
-        public string PolicyStatus { get; set; } = string.Empty;
+        // When the user submitted the application
+        public DateTime ApplicationDate { get; set; } = DateTime.Now;
+
+        // Current status in the workflow (Pending -> Approved or Denied)
+        public PolicyStatus Status { get; set; } = PolicyStatus.Pending;
+
+        // Which admin reviewed this policy
+        public int? ReviewedByAdminId { get; set; }
+
+        // When the admin made their decision
+        public DateTime? ReviewedAt { get; set; }
+
+        // Admin's notes/reason for approval or denial
+        [StringLength(1000)]
+        public string? AdminRemarks { get; set; }
+
+        // Navigation properties
+        [ForeignKey("UserId")]
+        public virtual AppUser? User { get; set; }
+
+        public virtual ICollection<Claim> Claims { get; set; } = new List<Claim>();
     }
 }

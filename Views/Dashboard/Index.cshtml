@@ -1,22 +1,23 @@
 @model InsuranceManagement.Web.Controllers.DashboardViewModel
 @{
     ViewData["Title"] = "Dashboard";
-    var username = ViewBag.Username;
-    var roles = ViewBag.Roles;
+    var username = ViewBag.Username as string;
+    var roles = ViewBag.Roles as string ?? "";
+    var isAdmin = roles.Contains("Admin");
 }
 
 <div class="container-fluid">
-    <!-- Welcome Section -->
+    <!-- Welcome Banner -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="welcome-banner">
                 <div class="row align-items-center">
                     <div class="col-md-8">
                         <h2>Welcome back, <strong>@username</strong>!</h2>
-                        <p class="mb-0">Here's what's happening with your insurance policies today.</p>
+                        <p class="mb-0">Here's an overview of your insurance activity.</p>
                     </div>
                     <div class="col-md-4 text-md-end">
-                        <span class="badge bg-primary fs-6">@roles</span>
+                        <span class="badge bg-light text-dark fs-6">@roles</span>
                     </div>
                 </div>
             </div>
@@ -27,9 +28,7 @@
     <div class="row mb-4">
         <div class="col-md-3">
             <div class="stat-card stat-card-primary">
-                <div class="stat-icon">
-                    <i class="bi bi-file-earmark-text"></i>
-                </div>
+                <div class="stat-icon"><i class="bi bi-file-earmark-text"></i></div>
                 <div class="stat-content">
                     <h3>@Model.TotalPolicies</h3>
                     <p>Total Policies</p>
@@ -38,40 +37,31 @@
         </div>
         <div class="col-md-3">
             <div class="stat-card stat-card-success">
-                <div class="stat-icon">
-                    <i class="bi bi-check-circle"></i>
-                </div>
+                <div class="stat-icon"><i class="bi bi-check-circle"></i></div>
                 <div class="stat-content">
                     <h3>@Model.ActivePolicies</h3>
-                    <p>Active Policies</p>
+                    <p>Approved Policies</p>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="stat-card stat-card-warning">
-                <div class="stat-icon">
-                    <i class="bi bi-clock-history"></i>
-                </div>
+                <div class="stat-icon"><i class="bi bi-clock-history"></i></div>
                 <div class="stat-content">
-                    <h3>@Model.PendingClaims</h3>
-                    <p>Pending Claims</p>
+                    <h3>@Model.PendingApplications</h3>
+                    <p>Pending Applications</p>
                 </div>
             </div>
         </div>
-        @if (roles.Contains("Admin"))
-        {
-            <div class="col-md-3">
-                <div class="stat-card stat-card-info">
-                    <div class="stat-icon">
-                        <i class="bi bi-people"></i>
-                    </div>
-                    <div class="stat-content">
-                        <h3>@Model.TotalUsers</h3>
-                        <p>Total Users</p>
-                    </div>
+        <div class="col-md-3">
+            <div class="stat-card stat-card-info">
+                <div class="stat-icon"><i class="bi bi-clipboard-check"></i></div>
+                <div class="stat-content">
+                    <h3>@Model.PendingClaims</h3>
+                    <p>@(isAdmin ? "Claims to Review" : "My Pending Claims")</p>
                 </div>
             </div>
-        }
+        </div>
     </div>
 
     <!-- Quick Actions -->
@@ -79,42 +69,49 @@
         <div class="col-12">
             <div class="quick-actions">
                 <h4 class="mb-3">Quick Actions</h4>
-                <div class="row">
-                    <div class="col-md-3">
-                        <a asp-controller="Insurance" asp-action="Create" class="action-card">
-                            <div class="action-icon">
-                                <i class="bi bi-plus-circle"></i>
-                            </div>
-                            <span>New Policy</span>
-                        </a>
-                    </div>
-                    <div class="col-md-3">
-                        <a asp-controller="Insurance" asp-action="Index" class="action-card">
-                            <div class="action-icon">
-                                <i class="bi bi-list-ul"></i>
-                            </div>
-                            <span>View Policies</span>
-                        </a>
-                    </div>
-                    @if (roles.Contains("Admin"))
+                <div class="row g-3">
+                    @if (!isAdmin)
                     {
                         <div class="col-md-3">
-                            <a asp-controller="Home" asp-action="Index" class="action-card">
-                                <div class="action-icon">
-                                    <i class="bi bi-gear"></i>
-                                </div>
-                                <span>Settings</span>
+                            <a asp-controller="Insurance" asp-action="Apply" class="action-card">
+                                <div class="action-icon"><i class="bi bi-plus-circle"></i></div>
+                                <span>Apply for Policy</span>
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a asp-controller="Insurance" asp-action="MyClaims" class="action-card">
+                                <div class="action-icon"><i class="bi bi-list-check"></i></div>
+                                <span>My Claims</span>
                             </a>
                         </div>
                     }
                     <div class="col-md-3">
-                        <a asp-controller="Account" asp-action="Logout" class="action-card">
-                            <div class="action-icon">
-                                <i class="bi bi-box-arrow-right"></i>
-                            </div>
-                            <span>Logout</span>
+                        <a asp-controller="Insurance" asp-action="Index" class="action-card">
+                            <div class="action-icon"><i class="bi bi-list-ul"></i></div>
+                            <span>View Policies</span>
                         </a>
                     </div>
+                    @if (isAdmin)
+                    {
+                        <div class="col-md-3">
+                            <a asp-controller="Insurance" asp-action="AdminDashboard" class="action-card">
+                                <div class="action-icon"><i class="bi bi-clipboard-check"></i></div>
+                                <span>Review Applications</span>
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a asp-controller="Insurance" asp-action="AllClaims" class="action-card">
+                                <div class="action-icon"><i class="bi bi-list-check"></i></div>
+                                <span>Review Claims</span>
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a asp-controller="UserManagement" asp-action="Index" class="action-card">
+                                <div class="action-icon"><i class="bi bi-people"></i></div>
+                                <span>Manage Users</span>
+                            </a>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -130,10 +127,10 @@
                         <thead>
                             <tr>
                                 <th>Policy Number</th>
-                                <th>Policy Holder</th>
+                                <th>Holder</th>
                                 <th>Type</th>
-                                <th>Coverage Amount</th>
-                                <th>Premium</th>
+                                <th>Coverage</th>
+                                <th>Premium/mo</th>
                                 <th>Status</th>
                                 <th>Action</th>
                             </tr>
@@ -143,21 +140,26 @@
                             {
                                 @foreach (var policy in Model.RecentPolicies)
                                 {
+                                    var badgeColor = policy.Status switch {
+                                        InsuranceManagement.Web.Models.PolicyStatus.Approved => "success",
+                                        InsuranceManagement.Web.Models.PolicyStatus.Pending => "warning",
+                                        InsuranceManagement.Web.Models.PolicyStatus.Denied => "danger",
+                                        _ => "secondary"
+                                    };
                                     <tr>
-                                        <td>@policy.PolicyNumber</td>
+                                        <td><strong>@policy.PolicyNumber</strong></td>
                                         <td>@policy.PolicyHolderName</td>
                                         <td>@policy.InsuranceType</td>
-                                        <td>@policy.CoverageAmount.ToString("C")</td>
-                                        <td>@policy.Premium.ToString("C")</td>
+                                        <td>$@policy.CoverageAmount.ToString("N2")</td>
+                                        <td>$@policy.Premium.ToString("N2")</td>
                                         <td>
-                                            <span class="badge bg-@GetStatusBadge(policy.PolicyStatus)">
-                                                @policy.PolicyStatus
+                                            <span class="badge bg-@badgeColor @(policy.Status == InsuranceManagement.Web.Models.PolicyStatus.Pending ? "text-dark" : "")">
+                                                @policy.Status
                                             </span>
                                         </td>
                                         <td>
-                                            <a asp-controller="Insurance" asp-action="Details" asp-route-id="@policy.Id" class="btn btn-sm btn-outline-primary">
-                                                View
-                                            </a>
+                                            <a asp-controller="Insurance" asp-action="Details" asp-route-id="@policy.Id"
+                                               class="btn btn-sm btn-outline-primary">View</a>
                                         </td>
                                     </tr>
                                 }
@@ -165,7 +167,7 @@
                             else
                             {
                                 <tr>
-                                    <td colspan="7" class="text-center text-muted">No policies found</td>
+                                    <td colspan="7" class="text-center text-muted py-3">No policies yet.</td>
                                 </tr>
                             }
                         </tbody>
@@ -176,19 +178,6 @@
     </div>
 </div>
 
-@functions {
-    string GetStatusBadge(string status)
-    {
-        return status switch
-        {
-            "Active" => "success",
-            "Pending" => "warning",
-            "Expired" => "danger",
-            _ => "secondary"
-        };
-    }
-}
-
 <style>
     .welcome-banner {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -196,7 +185,6 @@
         padding: 30px;
         border-radius: 10px;
     }
-
     .stat-card {
         background: white;
         border-radius: 10px;
@@ -206,7 +194,6 @@
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         margin-bottom: 20px;
     }
-
     .stat-icon {
         width: 60px;
         height: 60px;
@@ -217,30 +204,18 @@
         font-size: 24px;
         margin-right: 15px;
     }
-
-    .stat-card-primary .stat-icon { background: rgba(102, 126, 234, 0.1); color: #667eea; }
-    .stat-card-success .stat-icon { background: rgba(40, 167, 69, 0.1); color: #28a745; }
-    .stat-card-warning .stat-icon { background: rgba(255, 193, 7, 0.1); color: #ffc107; }
-    .stat-card-info .stat-icon { background: rgba(23, 162, 184, 0.1); color: #17a2b8; }
-
-    .stat-content h3 {
-        font-size: 28px;
-        font-weight: 700;
-        margin: 0;
-    }
-
-    .stat-content p {
-        margin: 0;
-        color: #6c757d;
-    }
-
+    .stat-card-primary .stat-icon { background: rgba(102,126,234,0.1); color: #667eea; }
+    .stat-card-success .stat-icon { background: rgba(40,167,69,0.1); color: #28a745; }
+    .stat-card-warning .stat-icon { background: rgba(255,193,7,0.1); color: #d39e00; }
+    .stat-card-info .stat-icon { background: rgba(23,162,184,0.1); color: #17a2b8; }
+    .stat-content h3 { font-size: 28px; font-weight: 700; margin: 0; }
+    .stat-content p { margin: 0; color: #6c757d; }
     .quick-actions, .recent-policies-card {
         background: white;
         border-radius: 10px;
         padding: 25px;
         box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
-
     .action-card {
         display: flex;
         flex-direction: column;
@@ -252,20 +227,12 @@
         color: #495057;
         transition: all 0.3s ease;
     }
-
     .action-card:hover {
         border-color: #667eea;
         color: #667eea;
         transform: translateY(-5px);
         box-shadow: 0 5px 15px rgba(0,0,0,0.1);
     }
-
-    .action-icon {
-        font-size: 32px;
-        margin-bottom: 10px;
-    }
-
-    .action-card span {
-        font-weight: 500;
-    }
+    .action-icon { font-size: 32px; margin-bottom: 10px; }
+    .action-card span { font-weight: 500; }
 </style>

@@ -14,27 +14,18 @@ namespace InsuranceManagement.Web.Controllers
             _context = context;
         }
 
-        // GET: /Dashboard/Index
         [HttpGet]
         public IActionResult Index()
         {
-            // Check if user is logged in
             var userId = HttpContext.Session.GetInt32("UserId");
             if (userId == null)
-            {
                 return RedirectToAction("Login", "Account");
-            }
 
-            var username = HttpContext.Session.GetString("Username");
-            var roles = HttpContext.Session.GetString("Roles");
-
-            ViewBag.Username = username;
-            ViewBag.Roles = roles;
+            ViewBag.Username = HttpContext.Session.GetString("Username");
+            ViewBag.Roles = HttpContext.Session.GetString("Roles");
             ViewBag.UserId = userId;
 
-            // Get dashboard statistics
-            var model = GetDashboardStats(userId.Value, roles ?? "");
-
+            var model = GetDashboardStats(userId.Value, ViewBag.Roles ?? "");
             return View(model);
         }
 
@@ -42,24 +33,31 @@ namespace InsuranceManagement.Web.Controllers
         {
             var model = new DashboardViewModel();
 
-            // Get insurance policies count
             model.TotalPolicies = _context.InsurancePolicies.Count();
 
-            // Get active policies
-            model.ActivePolicies = _context.InsurancePolicies.Count(p => p.PolicyStatus == "Active");
+            // Use the new Status enum (not the old PolicyStatus string)
+            model.ActivePolicies = _context.InsurancePolicies
+                .Count(p => p.Status == PolicyStatus.Approved);
 
-            // Get pending claims
-            model.PendingClaims = _context.InsurancePolicies.Count(p => p.PolicyStatus == "Pending");
+            model.PendingApplications = _context.InsurancePolicies
+                .Count(p => p.Status == PolicyStatus.Pending);
 
-            // Get total users (for admin)
+            model.PendingClaims = _context.Claims
+                .Count(c => c.Status == ClaimStatus.Submitted || c.Status == ClaimStatus.UnderReview);
+
             if (roles.Contains("Admin"))
             {
                 model.TotalUsers = _context.AppUsers.Count();
                 model.TotalRoles = _context.Roles.Count();
             }
 
-            // Get recent policies
-            model.RecentPolicies = _context.InsurancePolicies
+            // Recent policies - for admin show all, for users show their own
+            var query = _context.InsurancePolicies.Include(p => p.User).AsQueryable();
+            if (!roles.Contains("Admin"))
+                query = query.Where(p => p.UserId == userId);
+
+            model.RecentPolicies = query
+                .OrderByDescending(p => p.ApplicationDate)
                 .Take(5)
                 .ToList();
 
@@ -70,8 +68,8 @@ namespace InsuranceManagement.Web.Controllers
     public class DashboardViewModel
     {
         public int TotalPolicies { get; set; }
-        public int UserPoliciesCount { get; set; }
         public int ActivePolicies { get; set; }
+        public int PendingApplications { get; set; }
         public int PendingClaims { get; set; }
         public int TotalUsers { get; set; }
         public int TotalRoles { get; set; }

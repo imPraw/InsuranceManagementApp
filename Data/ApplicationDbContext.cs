@@ -1,29 +1,59 @@
-﻿using InsuranceManagement.Web.Models;
+using InsuranceManagement.Web.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace InsuranceManagement.Web.Data
 {
-    // DbContext is the bridge between our C# code and the SQLite database.
-    // It manages database connections and translates our C# operations into SQL.
     public class ApplicationDbContext : DbContext
     {
-        // This constructor receives configuration from Program.cs
-        // (like which database to use and where it's located).
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
             : base(options)
         {
         }
 
-        // DbSet represents the InsurancePolicies table in our database.
-        // We use this to query, add, update, and delete records.
-        // EF Core will create a table called "InsurancePolicies" based on this.
         public DbSet<InsurancePolicy> InsurancePolicies { get; set; }
+        public DbSet<Claim> Claims { get; set; }  // NEW: Claims table
 
-        // Authentication/Authorization DbSets
+        // Auth/Authorization DbSets
         public DbSet<AppUser> AppUsers { get; set; }
         public DbSet<Role> Roles { get; set; }
         public DbSet<UserRole> UserRoles { get; set; }
         public DbSet<Menu> Menus { get; set; }
         public DbSet<UserMenu> UserMenus { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            // Store enum as string so the database is human-readable
+            modelBuilder.Entity<InsurancePolicy>()
+                .Property(p => p.Status)
+                .HasConversion<string>();
+
+            modelBuilder.Entity<Claim>()
+                .Property(c => c.Status)
+                .HasConversion<string>();
+
+            // A policy belongs to one user; a user can have many policies
+            modelBuilder.Entity<InsurancePolicy>()
+                .HasOne(p => p.User)
+                .WithMany()
+                .HasForeignKey(p => p.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // A claim belongs to one policy; a policy can have many claims
+            modelBuilder.Entity<Claim>()
+                .HasOne(c => c.InsurancePolicy)
+                .WithMany(p => p.Claims)
+                .HasForeignKey(c => c.InsurancePolicyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // A claim also has a user (the claimant) - use NoAction to avoid
+            // multiple cascade paths which SQLite doesn't handle well
+            modelBuilder.Entity<Claim>()
+                .HasOne(c => c.User)
+                .WithMany()
+                .HasForeignKey(c => c.UserId)
+                .OnDelete(DeleteBehavior.NoAction);
+        }
     }
 }

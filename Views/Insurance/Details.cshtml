@@ -1,12 +1,144 @@
-﻿@model InsuranceManagement.Web.Models.InsurancePolicy
+@model InsuranceManagement.Web.Models.InsurancePolicy
+@{
+    ViewData["Title"] = "Policy Details";
+    var isAdmin = ViewBag.IsAdmin as bool? ?? false;
+    var badgeClass = Model.Status switch {
+        InsuranceManagement.Web.Models.PolicyStatus.Pending => "bg-warning text-dark",
+        InsuranceManagement.Web.Models.PolicyStatus.Approved => "bg-success",
+        InsuranceManagement.Web.Models.PolicyStatus.Denied => "bg-danger",
+        _ => "bg-secondary"
+    };
+}
 
-<h2>Policy Details</h2>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-file-earmark-text"></i> Policy Details</h2>
+    <a asp-action="Index" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to List
+    </a>
+</div>
 
-<p><b>Policy Number:</b> @Model.PolicyNumber</p>
-<p><b>Holder:</b> @Model.PolicyHolderName</p>
-<p><b>Type:</b> @Model.InsuranceType</p>
-<p><b>Coverage:</b> @Model.CoverageAmount</p>
-<p><b>Premium:</b> @Model.Premium</p>
-<p><b>Status:</b> @Model.PolicyStatus</p>
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success"><i class="bi bi-check-circle"></i> @TempData["Success"]</div>
+}
 
-<a asp-action="Index">Back</a>
+<div class="row">
+    <div class="col-lg-8">
+        <!-- Policy Info Card -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">@Model.PolicyNumber</h5>
+                <span class="badge @badgeClass fs-6">@Model.Status</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <div class="text-muted small">Policy Holder</div>
+                        <div class="fw-bold">@Model.PolicyHolderName</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="text-muted small">Insurance Type</div>
+                        <div class="fw-bold">@Model.InsuranceType</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="text-muted small">Coverage Amount</div>
+                        <div class="fw-bold text-success">$@Model.CoverageAmount.ToString("N2")</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="text-muted small">Monthly Premium</div>
+                        <div class="fw-bold">$@Model.Premium.ToString("N2")</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="text-muted small">Start Date</div>
+                        <div>@Model.StartDate.ToString("MMM dd, yyyy")</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="text-muted small">End Date</div>
+                        <div>@Model.EndDate.ToString("MMM dd, yyyy")</div>
+                    </div>
+                    <div class="col-12">
+                        <div class="text-muted small">Application Description</div>
+                        <div>@Model.ApplicationDescription</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="text-muted small">Applied On</div>
+                        <div>@Model.ApplicationDate.ToString("MMM dd, yyyy HH:mm")</div>
+                    </div>
+                </div>
+
+                @if (Model.ReviewedAt.HasValue)
+                {
+                    <hr />
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <div class="text-muted small">Reviewed On</div>
+                            <div>@Model.ReviewedAt.Value.ToString("MMM dd, yyyy HH:mm")</div>
+                        </div>
+                        @if (!string.IsNullOrEmpty(Model.AdminRemarks))
+                        {
+                            <div class="col-12">
+                                <div class="text-muted small">Admin Remarks</div>
+                                <div class="p-2 bg-light rounded">@Model.AdminRemarks</div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+            @if (!isAdmin && Model.Status == InsuranceManagement.Web.Models.PolicyStatus.Approved)
+            {
+                <div class="card-footer">
+                    <a asp-action="FileClaim" asp-route-id="@Model.Id" class="btn btn-success">
+                        <i class="bi bi-clipboard-plus"></i> File a Claim on This Policy
+                    </a>
+                </div>
+            }
+        </div>
+
+        <!-- Claims Section -->
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-list-check"></i> Claims (@Model.Claims.Count)</h5>
+            </div>
+            <div class="card-body">
+                @if (!Model.Claims.Any())
+                {
+                    <p class="text-muted mb-0">No claims filed on this policy yet.</p>
+                }
+                else
+                {
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Claim #</th>
+                                <th>Amount</th>
+                                <th>Incident Date</th>
+                                <th>Status</th>
+                                <th>Settled</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var claim in Model.Claims.OrderByDescending(c => c.SubmittedAt))
+                            {
+                                var claimBadge = claim.Status switch {
+                                    InsuranceManagement.Web.Models.ClaimStatus.Submitted => "bg-secondary",
+                                    InsuranceManagement.Web.Models.ClaimStatus.UnderReview => "bg-warning text-dark",
+                                    InsuranceManagement.Web.Models.ClaimStatus.Approved => "bg-primary",
+                                    InsuranceManagement.Web.Models.ClaimStatus.Denied => "bg-danger",
+                                    InsuranceManagement.Web.Models.ClaimStatus.Settled => "bg-success",
+                                    _ => "bg-secondary"
+                                };
+                                <tr>
+                                    <td><strong>@claim.ClaimNumber</strong></td>
+                                    <td>$@claim.ClaimAmount.ToString("N2")</td>
+                                    <td>@claim.IncidentDate.ToString("MMM dd, yyyy")</td>
+                                    <td><span class="badge @claimBadge">@claim.Status</span></td>
+                                    <td>@(claim.SettledAmount.HasValue ? "$" + claim.SettledAmount.Value.ToString("N2") : "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+    </div>
+</div>

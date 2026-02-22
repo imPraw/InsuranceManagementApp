@@ -1,4 +1,4 @@
-﻿using InsuranceManagement.Web.Data;
+using InsuranceManagement.Web.Data;
 using InsuranceManagement.Web.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -7,8 +7,6 @@ namespace InsuranceManagement.Web.Controllers
 {
     public class InsuranceController : Controller
     {
-        // Dependency injection: ASP.NET Core automatically provides the DbContext.
-        // We store it in this private field to use throughout the controller.
         private readonly ApplicationDbContext _context;
 
         public InsuranceController(ApplicationDbContext context)
@@ -16,111 +14,322 @@ namespace InsuranceManagement.Web.Controllers
             _context = context;
         }
 
+        // Helper: get logged-in user's ID from session. Returns null if not logged in.
+        private int? GetSessionUserId() => HttpContext.Session.GetInt32("UserId");
+
+        // Helper: check if the logged-in user is an Admin
+        private bool IsAdmin()
+        {
+            var roles = HttpContext.Session.GetString("Roles") ?? "";
+            return roles.Contains("Admin");
+        }
+
+        // ─────────────────────────────────────────────
+        // USER SECTION: Apply for a policy, view own policies
+        // ─────────────────────────────────────────────
+
         // GET: /Insurance
-        // Displays a list of all insurance policies.
+        // Regular users see their own policies. Admins see all policies.
         public async Task<IActionResult> Index()
         {
-            // ToListAsync() fetches all records from the InsurancePolicies table.
-            // "await" makes this non-blocking so the app stays responsive.
-            return View(await _context.InsurancePolicies.ToListAsync());
+            var userId = GetSessionUserId();
+            if (userId == null) return RedirectToAction("Login", "Account");
+
+            IQueryable<InsurancePolicy> query = _context.InsurancePolicies
+                .Include(p => p.User);
+
+            // Admins see everything; regular users only see their own
+            if (!IsAdmin())
+                query = query.Where(p => p.UserId == userId);
+
+            var policies = await query
+                .OrderByDescending(p => p.ApplicationDate)
+                .ToListAsync();
+
+            ViewBag.IsAdmin = IsAdmin();
+            return View(policies);
         }
 
-        // GET: /Insurance/Details/5
-        // Shows detailed information about a specific policy.
-        public async Task<IActionResult> Details(int id)
+        // GET: /Insurance/Apply
+        // Shows the policy application form for regular users
+        public IActionResult Apply()
         {
-            // FindAsync searches for a record by its primary key (Id).
-            var policy = await _context.InsurancePolicies.FindAsync(id);
-
-            // If no policy is found, return a 404 Not Found page.
-            if (policy == null) return NotFound();
-
-            return View(policy);
-        }
-
-        // GET: /Insurance/Create
-        // Shows the form to create a new policy.
-        public IActionResult Create()
-        {
-            // Just returns the empty form view.
+            if (GetSessionUserId() == null) return RedirectToAction("Login", "Account");
             return View();
         }
 
-        // POST: /Insurance/Create
-        // Handles form submission when creating a new policy.
+        // POST: /Insurance/Apply
+        // Handles submission of a new policy application
         [HttpPost]
-        public async Task<IActionResult> Create(InsurancePolicy policy)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Apply(InsurancePolicy policy)
         {
-            // ModelState.IsValid checks if all validation rules are satisfied.
-            // If validation fails, send the user back to the form with error messages.
+            var userId = GetSessionUserId();
+            if (userId == null) return RedirectToAction("Login", "Account");
+
+            // Remove validation for fields we'll set programmatically
+            ModelState.Remove("PolicyNumber");
+            ModelState.Remove("UserId");
+            ModelState.Remove("Status");
+
             if (!ModelState.IsValid) return View(policy);
 
-            // Add the new policy to the database context.
-            _context.Add(policy);
+            // Set fields the user shouldn't control
+            policy.UserId = userId.Value;
+            policy.ApplicationDate = DateTime.Now;
+            policy.Status = PolicyStatus.Pending;
 
-            // SaveChangesAsync() commits the changes to the database.
-            // Without this, nothing gets saved.
+            // Auto-generate a unique policy number: POL-YYYYMMDD-XXXXXX
+            policy.PolicyNumber = $"POL-{DateTime.Now:yyyyMMdd}-{Guid.NewGuid().ToString()[..6].ToUpper()}";
+
+            _context.InsurancePolicies.Add(policy);
             await _context.SaveChangesAsync();
 
-            // After saving, redirect to the Index page to show the updated list.
+            TempData["Success"] = $"Application submitted! Your reference number is {policy.PolicyNumber}. An admin will review your application shortly.";
             return RedirectToAction(nameof(Index));
         }
 
-        // GET: /Insurance/Edit/5
-        // Shows the form to edit an existing policy.
-        public async Task<IActionResult> Edit(int id)
+        // GET: /Insurance/Details/5
+        // View a single policy and all its claims
+        public async Task<IActionResult> Details(int id)
         {
-            var policy = await _context.InsurancePolicies.FindAsync(id);
+            var userId = GetSessionUserId();
+            if (userId == null) return RedirectToAction("Login", "Account");
+
+            var policy = await _context.InsurancePolicies
+                .Include(p => p.User)
+                .Include(p => p.Claims)
+                .FirstOrDefaultAsync(p => p.Id == id);
+
             if (policy == null) return NotFound();
 
-            // Pass the existing policy data to the view so the form is pre-filled.
+            // Users can only view their own policies (admins can view all)
+            if (!IsAdmin() && policy.UserId != userId)
+                return Forbid();
+
+            ViewBag.IsAdmin = IsAdmin();
             return View(policy);
         }
 
-        // POST: /Insurance/Edit/5
-        // Handles form submission when editing a policy.
+        // ─────────────────────────────────────────────
+        // ADMIN SECTION: Review and approve/deny policies
+        // ─────────────────────────────────────────────
+
+        // GET: /Insurance/AdminDashboard
+        // Admin-only page to review all policy applications
+        public async Task<IActionResult> AdminDashboard(string filter = "Pending")
+        {
+            if (!IsAdmin()) return Forbid();
+
+            // Build query filtered by status
+            var query = _context.InsurancePolicies
+                .Include(p => p.User)
+                .AsQueryable();
+
+            if (Enum.TryParse<PolicyStatus>(filter, out var statusFilter))
+                query = query.Where(p => p.Status == statusFilter);
+
+            // Count badges for the tab headers
+            ViewBag.Filter = filter;
+            ViewBag.PendingCount = await _context.InsurancePolicies.CountAsync(p => p.Status == PolicyStatus.Pending);
+            ViewBag.ApprovedCount = await _context.InsurancePolicies.CountAsync(p => p.Status == PolicyStatus.Approved);
+            ViewBag.DeniedCount = await _context.InsurancePolicies.CountAsync(p => p.Status == PolicyStatus.Denied);
+
+            return View(await query.OrderByDescending(p => p.ApplicationDate).ToListAsync());
+        }
+
+        // POST: /Insurance/ReviewPolicy
+        // Admin approves or denies a policy application
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReviewPolicy(int id, string decision, string? remarks)
+        {
+            if (!IsAdmin()) return Forbid();
+
+            var policy = await _context.InsurancePolicies.FindAsync(id);
+            if (policy == null) return NotFound();
+
+            var adminId = GetSessionUserId()!.Value;
+
+            // Update the policy with the admin's decision
+            policy.Status = decision == "Approve" ? PolicyStatus.Approved : PolicyStatus.Denied;
+            policy.ReviewedByAdminId = adminId;
+            policy.ReviewedAt = DateTime.Now;
+            policy.AdminRemarks = remarks;
+
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"Policy {policy.PolicyNumber} has been {policy.Status}.";
+            return RedirectToAction(nameof(AdminDashboard));
+        }
+
+        // ─────────────────────────────────────────────
+        // CLAIM FILING (MVC - from the UI)
+        // ─────────────────────────────────────────────
+
+        // GET: /Insurance/FileClaim/5 (policyId)
+        // Shows form to file a claim against an approved policy
+        public async Task<IActionResult> FileClaim(int id)
+        {
+            var userId = GetSessionUserId();
+            if (userId == null) return RedirectToAction("Login", "Account");
+
+            var policy = await _context.InsurancePolicies.FindAsync(id);
+            if (policy == null) return NotFound();
+
+            // Can only file claims on your own approved policies
+            if (policy.UserId != userId)
+                return Forbid();
+
+            if (policy.Status != PolicyStatus.Approved)
+            {
+                TempData["Error"] = "You can only file claims on approved policies.";
+                return RedirectToAction(nameof(Details), new { id });
+            }
+
+            ViewBag.Policy = policy;
+            return View(new Claim { InsurancePolicyId = id });
+        }
+
+        // POST: /Insurance/FileClaim
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> FileClaim(Claim claim)
+        {
+            var userId = GetSessionUserId();
+            if (userId == null) return RedirectToAction("Login", "Account");
+
+            ModelState.Remove("ClaimNumber");
+            ModelState.Remove("UserId");
+            ModelState.Remove("Status");
+
+            var policy = await _context.InsurancePolicies.FindAsync(claim.InsurancePolicyId);
+            if (policy == null || policy.UserId != userId || policy.Status != PolicyStatus.Approved)
+            {
+                TempData["Error"] = "Invalid policy for claim submission.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (!ModelState.IsValid)
+            {
+                ViewBag.Policy = policy;
+                return View(claim);
+            }
+
+            claim.UserId = userId.Value;
+            claim.SubmittedAt = DateTime.Now;
+            claim.Status = ClaimStatus.Submitted;
+            claim.ClaimNumber = $"CLM-{DateTime.Now:yyyyMMdd}-{Guid.NewGuid().ToString()[..6].ToUpper()}";
+
+            _context.Claims.Add(claim);
+            await _context.SaveChangesAsync();
+
+            TempData["Success"] = $"Claim {claim.ClaimNumber} submitted successfully!";
+            return RedirectToAction(nameof(Details), new { id = claim.InsurancePolicyId });
+        }
+
+        // GET: /Insurance/MyClaims
+        // User views all their claims across all policies
+        public async Task<IActionResult> MyClaims()
+        {
+            var userId = GetSessionUserId();
+            if (userId == null) return RedirectToAction("Login", "Account");
+
+            var claims = await _context.Claims
+                .Include(c => c.InsurancePolicy)
+                .Where(c => c.UserId == userId)
+                .OrderByDescending(c => c.SubmittedAt)
+                .ToListAsync();
+
+            return View(claims);
+        }
+
+        // GET: /Insurance/AllClaims (admin only)
+        public async Task<IActionResult> AllClaims(string filter = "")
+        {
+            if (!IsAdmin()) return Forbid();
+
+            var query = _context.Claims
+                .Include(c => c.InsurancePolicy)
+                .Include(c => c.User)
+                .AsQueryable();
+
+            if (Enum.TryParse<ClaimStatus>(filter, out var statusFilter))
+                query = query.Where(c => c.Status == statusFilter);
+
+            ViewBag.Filter = filter;
+            return View(await query.OrderByDescending(c => c.SubmittedAt).ToListAsync());
+        }
+
+        // POST: /Insurance/ReviewClaim
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReviewClaim(int id, string decision, string? remarks, decimal? settledAmount)
+        {
+            if (!IsAdmin()) return Forbid();
+
+            var claim = await _context.Claims.FindAsync(id);
+            if (claim == null) return NotFound();
+
+            claim.ReviewedByAdminId = GetSessionUserId()!.Value;
+            claim.ReviewedAt = DateTime.Now;
+            claim.AdminRemarks = remarks;
+
+            if (decision == "Approve")
+            {
+                claim.Status = settledAmount.HasValue ? ClaimStatus.Settled : ClaimStatus.Approved;
+                claim.SettledAmount = settledAmount;
+            }
+            else
+            {
+                claim.Status = ClaimStatus.Denied;
+            }
+
+            await _context.SaveChangesAsync();
+            TempData["Success"] = $"Claim {claim.ClaimNumber} has been {claim.Status}.";
+            return RedirectToAction(nameof(AllClaims));
+        }
+
+        // ─────────────────────────────────────────────
+        // LEGACY CRUD (kept for backwards compatibility)
+        // ─────────────────────────────────────────────
+
+        public async Task<IActionResult> Edit(int id)
+        {
+            if (!IsAdmin()) return Forbid();
+            var policy = await _context.InsurancePolicies.FindAsync(id);
+            if (policy == null) return NotFound();
+            return View(policy);
+        }
+
         [HttpPost]
         public async Task<IActionResult> Edit(InsurancePolicy policy)
         {
+            if (!IsAdmin()) return Forbid();
             if (!ModelState.IsValid) return View(policy);
-
-            // Update() tells EF Core that this record has been modified.
             _context.Update(policy);
-
-            // Save the changes to the database.
             await _context.SaveChangesAsync();
-
             return RedirectToAction(nameof(Index));
         }
 
-        // GET: /Insurance/Delete/5
-        // Shows a confirmation page before deleting a policy.
         public async Task<IActionResult> Delete(int id)
         {
+            if (!IsAdmin()) return Forbid();
             var policy = await _context.InsurancePolicies.FindAsync(id);
             if (policy == null) return NotFound();
-
-            // Display the policy details so the user can confirm deletion.
             return View(policy);
         }
 
-        // POST: /Insurance/Delete/5
-        // Actually deletes the policy after user confirms.
         [HttpPost, ActionName("Delete")]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
+            if (!IsAdmin()) return Forbid();
             var policy = await _context.InsurancePolicies.FindAsync(id);
-
-            // Check if the policy exists before trying to delete it.
             if (policy != null)
             {
-                // Remove the policy from the database context.
                 _context.InsurancePolicies.Remove(policy);
-
-                // Commit the deletion to the database.
                 await _context.SaveChangesAsync();
             }
-
             return RedirectToAction(nameof(Index));
         }
     }

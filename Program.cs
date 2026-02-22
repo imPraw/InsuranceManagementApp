@@ -3,16 +3,17 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Add MVC (for views) AND API controllers together
 builder.Services.AddControllersWithViews();
 
-// Register Entity Framework Core with SQLite.
-// This tells the app to use SQLite as the database and store it in "insurance.db".
-// The database file will be created in the project root folder.
+// Required for ClaimsApiController to access the session (to check who's logged in)
+builder.Services.AddHttpContextAccessor();
+
+// Register Entity Framework Core with SQLite
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite("Data Source=insurance.db"));
 
-// Add session support for authentication
+// Session support for our custom authentication
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
@@ -23,7 +24,6 @@ builder.Services.AddSession(options =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -32,25 +32,28 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
-
 app.UseRouting();
 
-// Add session middleware before authorization
+// Session must come BEFORE authorization and routing
 app.UseSession();
 
 app.UseAuthorization();
 
-// Seed default data
+// Seed default data (admin user, roles, menus)
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    // Make sure the database and all tables exist
+    context.Database.EnsureCreated();
     DbSeeder.SeedData(context);
 }
 
-// Default routing pattern: /{Controller}/{Action}/{id?}
-// Example: /Insurance/Edit/5 calls InsuranceController.Edit(5)
+// This handles both MVC routes (/Insurance/Index) and API routes (/api/claims)
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
+
+// This enables the [ApiController] attribute routes like /api/claims
+app.MapControllers();
 
 app.Run();
